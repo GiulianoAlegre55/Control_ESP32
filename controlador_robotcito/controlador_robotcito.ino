@@ -1,3 +1,11 @@
+#include <HTTP_Method.h>
+#include <Uri.h>
+#include <WebServer.h>
+
+#include <AsyncUDP.h>
+
+#include <dummy.h>
+
 /*********
   Rui Santos
   Complete project details at http://randomnerdtutorials.com  
