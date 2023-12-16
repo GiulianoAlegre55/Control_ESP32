@@ -14,8 +14,10 @@
 const char* ssid = "REPLACE_WITH_YOUR_SSID";
 const char* password = "REPLACE_WITH_YOUR_PASSWORD";
 
-bool ledState = 0;
-const int ledPin = 2;
+// bool ledState = 0;
+bool RightState = 0;
+bool LeftState = 0;
+// const int ledPin = 2;
 
 // Create AsyncWebServer object on port 80
 AsyncWebServer server(80);
@@ -146,21 +148,28 @@ const char index_html[] PROGMEM = R"rawliteral(
 </html>
 )rawliteral";
 
+// esta funcion notifica a todos los usuarios del cambio del estado del led
 void notifyClients() {
   ws.textAll(String(ledState));
 }
 
+//  cambia el estado de los botones
 void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
   AwsFrameInfo *info = (AwsFrameInfo*)arg;
   if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
     data[len] = 0;
-    if (strcmp((char*)data, "toggle") == 0) {
-      ledState = !ledState;
+    if (strcmp((char*)data, "Right") == 0) {
+      RightState = !RightState;
+      notifyClients();
+    }
+    if (strcmp((char*)data, "Left") == 0) {
+      LeftState = !LeftState;
       notifyClients();
     }
   }
 }
 
+// funcion que muestra en la consola las ip
 void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type,
              void *arg, uint8_t *data, size_t len) {
   switch (type) {
@@ -184,6 +193,7 @@ void initWebSocket() {
   server.addHandler(&ws);
 }
 
+// Esta funcion se encarga de cambiar el cuadrito que decia si está encendido o no el led
 String processor(const String& var){
   Serial.println(var);
   if(var == "STATE"){
