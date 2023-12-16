@@ -66,21 +66,22 @@
         font-weight: bold;
       }
     </style>
-    <title>ESP Web Server</title>
+    <title>Epic Robot Controller</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" href="data:," />
   </head>
   <body>
-    <div class="topnav">
+    <!-- <div class="topnav">
       <h1>ESP WebSocket Server</h1>
-    </div>
-    <div class="content">
-      <div class="card">
-        <h2>Output - GPIO 2</h2>
-        <p class="state">state: <span id="state">%STATE%</span></p>
-        <p><button id="button" class="button">Toggle</button></p>
-      </div>
-    </div>
+    </div> -->
+    <!-- <div class="content"> -->
+    <!-- <div class="card"> -->
+    <!-- <h2>Output - GPIO 2</h2> -->
+    <!-- <p class="state">state: <span id="state">%STATE%</span></p> -->
+    <!-- </div> -->
+    <!-- </div> -->
+    <p><button id="Right" class="button">Right</button></p>
+    <p><button id="Left" class="button">Left</button></p>
     <script>
       var gateway = `ws://${window.location.hostname}/ws`;
       var websocket;
@@ -113,10 +114,14 @@
         initButton();
       }
       function initButton() {
-        document.getElementById("button").addEventListener("click", toggle);
+        document.getElementById("Right").addEventListener("click", Right);
+        document.getElementById("Left").addEventListener("click", Left);
       }
-      function toggle() {
-        websocket.send("toggle");
+      function Right() {
+        websocket.send("Right"); //envia al servidor el texto right
+      }
+      function Left() {
+        websocket.send("Left"); //envia al servidor el texto left
       }
     </script>
   </body>
