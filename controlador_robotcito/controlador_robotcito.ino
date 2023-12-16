@@ -1,163 +1,231 @@
-#include <HTTP_Method.h>
-#include <Uri.h>
-#include <WebServer.h>
-
-#include <AsyncUDP.h>
-
-#include <dummy.h>
-
 /*********
   Rui Santos
-  Complete project details at http://randomnerdtutorials.com  
+  Complete project details at https://RandomNerdTutorials.com/esp32-websocket-server-arduino/
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
 *********/
 
-// Load Wi-Fi library
+// Import required libraries
 #include <WiFi.h>
+#include <AsyncTCP.h>
+#include <ESPAsyncWebServer.h>
 
 // Replace with your network credentials
 const char* ssid = "REPLACE_WITH_YOUR_SSID";
 const char* password = "REPLACE_WITH_YOUR_PASSWORD";
 
-// Set web server port number to 80
-WiFiServer server(80);
+bool ledState = 0;
+const int ledPin = 2;
 
-// Variable to store the HTTP request
-String header;
+// Create AsyncWebServer object on port 80
+AsyncWebServer server(80);
+AsyncWebSocket ws("/ws");
 
-// Auxiliar variables to store the current output state
-String output26State = "off";
-String output27State = "off";
+const char index_html[] PROGMEM = R"rawliteral(
+<!DOCTYPE HTML><html>
+<head>
+  <title>ESP Web Server</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <style>
+  html {
+    font-family: Arial, Helvetica, sans-serif;
+    text-align: center;
+  }
+  h1 {
+    font-size: 1.8rem;
+    color: white;
+  }
+  h2{
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #143642;
+  }
+  .topnav {
+    overflow: hidden;
+    background-color: #143642;
+  }
+  body {
+    margin: 0;
+  }
+  .content {
+    padding: 30px;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+  .card {
+    background-color: #F8F7F9;;
+    box-shadow: 2px 2px 12px 1px rgba(140,140,140,.5);
+    padding-top:10px;
+    padding-bottom:20px;
+  }
+  .button {
+    padding: 15px 50px;
+    font-size: 24px;
+    text-align: center;
+    outline: none;
+    color: #fff;
+    background-color: #0f8b8d;
+    border: none;
+    border-radius: 5px;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: rgba(0,0,0,0);
+   }
+   /*.button:hover {background-color: #0f8b8d}*/
+   .button:active {
+     background-color: #0f8b8d;
+     box-shadow: 2 2px #CDCDCD;
+     transform: translateY(2px);
+   }
+   .state {
+     font-size: 1.5rem;
+     color:#8c8c8c;
+     font-weight: bold;
+   }
+  </style>
+<title>ESP Web Server</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+</head>
+<body>
+  <div class="topnav">
+    <h1>ESP WebSocket Server</h1>
+  </div>
+  <div class="content">
+    <div class="card">
+      <h2>Output - GPIO 2</h2>
+      <p class="state">state: <span id="state">%STATE%</span></p>
+      <p><button id="button" class="button">Toggle</button></p>
+    </div>
+  </div>
+<script>
+  var gateway = `ws://${window.location.hostname}/ws`;
+  var websocket;
+  window.addEventListener('load', onLoad);
+  function initWebSocket() {
+    console.log('Trying to open a WebSocket connection...');
+    websocket = new WebSocket(gateway);
+    websocket.onopen    = onOpen;
+    websocket.onclose   = onClose;
+    websocket.onmessage = onMessage; // <-- add this line
+  }
+  function onOpen(event) {
+    console.log('Connection opened');
+  }
+  function onClose(event) {
+    console.log('Connection closed');
+    setTimeout(initWebSocket, 2000);
+  }
+  function onMessage(event) {
+    var state;
+    if (event.data == "1"){
+      state = "ON";
+    }
+    else{
+      state = "OFF";
+    }
+    document.getElementById('state').innerHTML = state;
+  }
+  function onLoad(event) {
+    initWebSocket();
+    initButton();
+  }
+  function initButton() {
+    document.getElementById('button').addEventListener('click', toggle);
+  }
+  function toggle(){
+    websocket.send('toggle');
+  }
+</script>
+</body>
+</html>
+)rawliteral";
 
-// Assign output variables to GPIO pins
-const int output26 = 26;
-const int output27 = 27;
+void notifyClients() {
+  ws.textAll(String(ledState));
+}
 
-// Current time
-unsigned long currentTime = millis();
-// Previous time
-unsigned long previousTime = 0; 
-// Define timeout time in milliseconds (example: 2000ms = 2s)
-const long timeoutTime = 2000;
+void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
+  AwsFrameInfo *info = (AwsFrameInfo*)arg;
+  if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
+    data[len] = 0;
+    if (strcmp((char*)data, "toggle") == 0) {
+      ledState = !ledState;
+      notifyClients();
+    }
+  }
+}
 
-void setup() {
+void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type,
+             void *arg, uint8_t *data, size_t len) {
+  switch (type) {
+    case WS_EVT_CONNECT:
+      Serial.printf("WebSocket client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
+      break;
+    case WS_EVT_DISCONNECT:
+      Serial.printf("WebSocket client #%u disconnected\n", client->id());
+      break;
+    case WS_EVT_DATA:
+      handleWebSocketMessage(arg, data, len);
+      break;
+    case WS_EVT_PONG:
+    case WS_EVT_ERROR:
+      break;
+  }
+}
+
+void initWebSocket() {
+  ws.onEvent(onEvent);
+  server.addHandler(&ws);
+}
+
+String processor(const String& var){
+  Serial.println(var);
+  if(var == "STATE"){
+    if (ledState){
+      return "ON";
+    }
+    else{
+      return "OFF";
+    }
+  }
+  return String();
+}
+
+void setup(){
+  // Serial port for debugging purposes
   Serial.begin(115200);
-  // Initialize the output variables as outputs
-  pinMode(output26, OUTPUT);
-  pinMode(output27, OUTPUT);
-  // Set outputs to LOW
-  digitalWrite(output26, LOW);
-  digitalWrite(output27, LOW);
 
-  // Connect to Wi-Fi network with SSID and password
-  Serial.print("Connecting to ");
-  Serial.println(ssid);
+  pinMode(ledPin, OUTPUT);
+  digitalWrite(ledPin, LOW);
+  
+  // Connect to Wi-Fi
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
+    delay(1000);
+    Serial.println("Connecting to WiFi..");
   }
-  // Print local IP address and start web server
-  Serial.println("");
-  Serial.println("WiFi connected.");
-  Serial.println("IP address: ");
+
+  // Print ESP Local IP Address
   Serial.println(WiFi.localIP());
+
+  initWebSocket();
+
+  // Route for root / web page
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send_P(200, "text/html", index_html, processor);
+  });
+
+  // Start server
   server.begin();
 }
 
-void loop(){
-  WiFiClient client = server.available();   // Listen for incoming clients
-
-  if (client) {                             // If a new client connects,
-    currentTime = millis();
-    previousTime = currentTime;
-    Serial.println("New Client.");          // print a message out in the serial port
-    String currentLine = "";                // make a String to hold incoming data from the client
-    while (client.connected() && currentTime - previousTime <= timeoutTime) {  // loop while the client's connected
-      currentTime = millis();
-      if (client.available()) {             // if there's bytes to read from the client,
-        char c = client.read();             // read a byte, then
-        Serial.write(c);                    // print it out the serial monitor
-        header += c;
-        if (c == '\n') {                    // if the byte is a newline character
-          // if the current line is blank, you got two newline characters in a row.
-          // that's the end of the client HTTP request, so send a response:
-          if (currentLine.length() == 0) {
-            // HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
-            // and a content-type so the client knows what's coming, then a blank line:
-            client.println("HTTP/1.1 200 OK");
-            client.println("Content-type:text/html");
-            client.println("Connection: close");
-            client.println();
-            
-            // turns the GPIOs on and off
-            if (header.indexOf("GET /26/on") >= 0) {
-              Serial.println("GPIO 26 on");
-              output26State = "on";
-              digitalWrite(output26, HIGH);
-            } else if (header.indexOf("GET /26/off") >= 0) {
-              Serial.println("GPIO 26 off");
-              output26State = "off";
-              digitalWrite(output26, LOW);
-            } else if (header.indexOf("GET /27/on") >= 0) {
-              Serial.println("GPIO 27 on");
-              output27State = "on";
-              digitalWrite(output27, HIGH);
-            } else if (header.indexOf("GET /27/off") >= 0) {
-              Serial.println("GPIO 27 off");
-              output27State = "off";
-              digitalWrite(output27, LOW);
-            }
-            
-            // Display the HTML web page
-            client.println("<!DOCTYPE html><html>");
-            client.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
-            client.println("<link rel=\"icon\" href=\"data:,\">");
-            // CSS to style the on/off buttons 
-            // Feel free to change the background-color and font-size attributes to fit your preferences
-            client.println("<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}");
-            client.println(".button { background-color: #4CAF50; border: none; color: white; padding: 16px 40px;");
-            client.println("text-decoration: none; font-size: 30px; margin: 2px; cursor: pointer;}");
-            client.println(".button2 {background-color: #555555;}</style></head>");
-            
-            // Web Page Heading
-            client.println("<body><h1>ESP32 Web Server</h1>");
-            
-            // Display current state, and ON/OFF buttons for GPIO 26  
-            client.println("<p>GPIO 26 - State " + output26State + "</p>");
-            // If the output26State is off, it displays the ON button       
-            if (output26State=="off") {
-              client.println("<p><a href=\"/26/on\"><button class=\"button\">ON</button></a></p>");
-            } else {
-              client.println("<p><a href=\"/26/off\"><button class=\"button button2\">OFF</button></a></p>");
-            } 
-               
-            // Display current state, and ON/OFF buttons for GPIO 27  
-            client.println("<p>GPIO 27 - State " + output27State + "</p>");
-            // If the output27State is off, it displays the ON button       
-            if (output27State=="off") {
-              client.println("<p><a href=\"/27/on\"><button class=\"button\">ON</button></a></p>");
-            } else {
-              client.println("<p><a href=\"/27/off\"><button class=\"button button2\">OFF</button></a></p>");
-            }
-            client.println("</body></html>");
-            
-            // The HTTP response ends with another blank line
-            client.println();
-            // Break out of the while loop
-            break;
-          } else { // if you got a newline, then clear currentLine
-            currentLine = "";
-          }
-        } else if (c != '\r') {  // if you got anything else but a carriage return character,
-          currentLine += c;      // add it to the end of the currentLine
-        }
-      }
-    }
-    // Clear the header variable
-    header = "";
-    // Close the connection
-    client.stop();
-    Serial.println("Client disconnected.");
-    Serial.println("");
-  }
+void loop() {
+  ws.cleanupClients();
+  digitalWrite(ledPin, ledState);
 }
