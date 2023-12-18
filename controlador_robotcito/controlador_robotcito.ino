@@ -14,10 +14,11 @@
 const char* ssid = "REPLACE_WITH_YOUR_SSID";
 const char* password = "REPLACE_WITH_YOUR_PASSWORD";
 
-// bool ledState = 0;
+
 bool RightState = 0;
 bool LeftState = 0;
-// const int ledPin = 2;
+int RightPin = 29;
+int LeftPin = 28;
 
 // Create AsyncWebServer object on port 80
 AsyncWebServer server(80);
@@ -188,6 +189,7 @@ void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType 
   }
 }
 
+//funcion que inicia el websocket
 void initWebSocket() {
   ws.onEvent(onEvent);
   server.addHandler(&ws);
@@ -211,8 +213,10 @@ void setup(){
   // Serial port for debugging purposes
   Serial.begin(115200);
 
-  pinMode(ledPin, OUTPUT);
-  digitalWrite(ledPin, LOW);
+  pinMode(RightPin, OUTPUT);
+  pinMode(LeftPin, OUTPUT);
+  digitalWrite(RightPin, LOW);
+  digitalWrite(LeftPin, LOW);
   
   // Connect to Wi-Fi
   WiFi.begin(ssid, password);
@@ -237,5 +241,6 @@ void setup(){
 
 void loop() {
   ws.cleanupClients();
-  digitalWrite(ledPin, ledState);
+  digitalWrite(RightPin, RightState);
+  digitalWrite(LeftPin, LeftState);
 }
