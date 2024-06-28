@@ -78,3 +78,13 @@ En la siguiente imagen se puede ver como podrian quedar los controles utilizando
 ![ejemplo controles ](https://www.mobilegamer.com.br/wp-content/uploads/2023/04/Drive-Zone-Online.webp)
 
 ![ejemplo controles](https://i0.wp.com/solotendencias.net/wp-content/uploads/2021/07/mejores-juegos-de-carrera.jpg?fit=779%2C437&ssl=1)
+
+#### OTA
+
+##### Definicion de OTA
+
+[Video De Youtube](https://www.youtube.com/watch?v=kfCInkH-0nw)
+
+Para utilizar OTA debemos realizar los siguientes pasos: [clic.](https://youtu.be/LUcKoJGX38M)
+
+![meme](https://lastminuteengineers.com/wp-content/uploads/2023/11/ESP32-Static-or-Fixed-IP-Address-Tutorial.png)
